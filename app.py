@@ -5,12 +5,34 @@ import numpy as np
 from math import atan
 from math import degrees
 from telebot import types
+from flask import Flask, request
 sys.path.append('config/')
 import config
+import os
+
+bot = telebot.TeleBot(os.environ.get('TOKEN', 'placeholder'))
+
+if "HEROKU" in list(os.environ.keys()):
+    logger = telebot.logger
+    telebot.logger.setLevel(logging.INFO)
+
+    server = Flask(__name__)
+    @server.route("/bot", methods=['POST'])
+    def getMessage():
+        bot.process_new_updates([telebot.types.Update.de_json(request.stream.read().decode("utf-8"))])
+        return "!", 200
+    @server.route("/")
+    def webhook():
+        bot.remove_webhook()
+        bot.set_webhook(url="https://memeser.herokuapp.com/bot") # этот url нужно заменить на url вашего Хероку приложения
+        return "?", 200
+    server.run(host="0.0.0.0", port=os.environ.get('PORT', 80))
+else:
+    bot.remove_webhook()
+    bot.polling(none_stop=True)
 
 face_cascade = cv.CascadeClassifier('config/haarcascade_frontalface_default.xml')
 eye_cascade = cv.CascadeClassifier('config/haarcascade_eye.xml')
-bot = telebot.TeleBot(config.token)
 
 @bot.message_handler(commands=['help'])
 def send_help_message(message):
@@ -110,8 +132,3 @@ def pepe_frog(message):
     cv.imwrite(result,image)
     bot.send_photo(message.chat.id, open(result, 'r'))
 
-while True:
-    try:
-        bot.polling(none_stop=True)
-    except Exception as e:
-        print(e)
